@@ -2,11 +2,13 @@
 
 namespace App\Console\Commands;
 
+use App\Exports\MigrateErrorReport;
 use App\Models\Customer;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Maatwebsite\Excel\Facades\Excel;
 
 class MigrateCsv extends Command
 {
@@ -26,6 +28,7 @@ class MigrateCsv extends Command
         $this->info('Начало выполнения команды:' . $this->description);
         $this->parseFile();
         $this->createCustomers();
+        $this->errorReport();
     }
 
     public function createCustomers(): void
@@ -35,9 +38,17 @@ class MigrateCsv extends Command
         }
     }
 
+    public function errorReport(): void
+    {
+        if(!count($this->errors)) return;
+
+        $fileName = 'reports' . DIRECTORY_SEPARATOR . 'error_report_' . now()->format('d.m.Y_HH_ii') . '.xlsx';
+        Excel::store(new MigrateErrorReport(collect($this->errors)), $fileName);
+    }
+
     public function createCustomerItem(Collection $item): void
     {
-        $validator = Validator::make($item->toArray(), [
+        $validator = Validator::make($this->prepareRow($item)->toArray(), [
             'name'     => 'required|string|max:255',
             'email'    => 'required|email:rfc,dns',
             'age'      => 'required|integer|min:18|max:99',
@@ -50,6 +61,12 @@ class MigrateCsv extends Command
         }
 
         Customer::create($validator->validated());
+    }
+
+    private function prepareRow(Collection $item): Collection
+    {
+        $item['age'] = intval($item['age']);
+        return  $item;
     }
 
     private function setError(array $keys, $id): void

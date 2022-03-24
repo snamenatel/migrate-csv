@@ -29,6 +29,10 @@ class MigrateCsv extends Command
         $this->parseFile();
         $this->createCustomers();
         $this->errorReport();
+        $this->info('Завершено выполнение команды:' . $this->description);
+        $errorsCount = count($this->errors);
+        $successCount = $this->countCols - $errorsCount;
+        $this->warn("Обработано строк: \r\n успешно {$successCount} \r\n с ошибками {$errorsCount}");
     }
 
     public function createCustomers(): void

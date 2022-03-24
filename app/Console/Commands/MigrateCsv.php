@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Customer;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
@@ -29,24 +30,39 @@ class MigrateCsv extends Command
 
     public function createCustomers(): void
     {
-        foreach($this->contentRows as $item) {
-            $this->createCustomers($item);
+        foreach ($this->contentRows as $item) {
+            $this->createCustomerItem($item);
         }
     }
 
     public function createCustomerItem(Collection $item): void
     {
-        Validator::make($item->toArray(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|email:rfc,dns',
-            'age' => 'required|integer|min:18|max:99',
+        $validator = Validator::make($item->toArray(), [
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email:rfc,dns',
+            'age'      => 'required|integer|min:18|max:99',
             'location' => 'string',
         ]);
+        if ($validator->fails()) {
+            $this->setError($validator->errors()->keys(), $item['id']);
+
+            return;
+        }
+
+        Customer::create($validator->validated());
+    }
+
+    private function setError(array $keys, $id): void
+    {
+        $this->errors[] = [
+            'column'    => implode(',', $keys),
+            'originial' => $this->originalRows[$id],
+        ];
     }
 
     public function parseFile(): void
     {
-        $this->originalRows = $this->getRows($this->getFileContent());
+        $this->originalRows = $this->getRows(preg_replace("/\R$/", '', $this->getFileContent()));
         if (count($this->originalRows) < 2) {
             $this->error('Пустой файл');
             exit();
